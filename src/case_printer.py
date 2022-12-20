@@ -1,33 +1,21 @@
-from scipy.spatial import ConvexHull
-import numpy as np
-from numpy import asarray
-from stl import mesh
+import pymesh
 
 
 class CasePrinter(object):
     def __init__(self) -> None:
-        self.stl_mesh = None
+        self._mesh = None
 
     def load_stl_from_file(self, filename):
         # Load the STL file
-        self.stl_mesh = mesh.Mesh.from_file(filename)
+        #self.stl_mesh = mesh.Mesh.from_file(filename)
+        self._mesh = pymesh.load_mesh(filename)
 
     def create_case(self, output_path):
-        points = np.array(self.stl_mesh.vectors)
         # Compute the convex hull
         print("Comupting convex hull")
-        hull = ConvexHull(points)
-        # Extract the vertices of the convex hull
-        vertices = points[hull.vertices]
-
-        # Define the vertices of the mesh
-        vertices = asarray(vertices)
-
+        #all_vertices = np.concatenate((self.stl_mesh.v0, self.stl_mesh.v1, self.stl_mesh.v2))
+        hull = pymesh.convex_hull(self._mesh)
         # Create the mesh
-        print("Creating new mesh")
-        convex_hull_mesh = mesh.Mesh(np.zeros(vertices.shape[0], dtype=mesh.Mesh.dtype))
-        for i, point in enumerate(vertices):
-            convex_hull_mesh.vectors[i] = point
+        print("Saving new mesh")
+        pymesh.save_mesh(output_path, hull)
 
-        # Export the mesh to an STL file
-        convex_hull_mesh.save(output_path)
