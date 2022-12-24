@@ -11,7 +11,7 @@ class CasePrinter(object):
     _REFINEMENT_ORDER = 3
     def __init__(self, mesh_path) -> None:
         self._mesh = pymesh.load_mesh(mesh_path)
-        # self._mesh = self.fix_mesh(self._mesh)
+        self._mesh = self.fix_mesh(self._mesh)
 
     def create_case(self, thickness=1) -> pymesh.Mesh:
         # Compute the convex hull
@@ -95,6 +95,7 @@ class CasePrinter(object):
         mesh.plot()
 
     def display_two_meshes(self, mesh1, mesh2, show_edges=False):
+        # pyvista.start_xvfb()
         plotter = pyvista.Plotter(shape=(1, 2))
 
         # Note that the (0, 0) location is active by default

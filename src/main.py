@@ -10,13 +10,17 @@ def main():
     filename = args.filename
 
     base, ext = os.path.splitext(filename)
-    output_filename = f'{base}_case.{ext}'
+    top_output_filename = f'{base}_case_top{ext}'
+    bottom_output_filename = f'{base}_case_bottom{ext}'
 
     cp = CasePrinter(filename)
     top_half, bottom_half = cp.create_case()
-    # cp.save_mesh_to_stl(output_case, output_filename)
+
+    cp.save_mesh_to_stl(top_half, top_output_filename)
+    cp.save_mesh_to_stl(bottom_half, bottom_output_filename)
     # cp.display_stl(output_filename)
-    cp.display_two_meshes(top_half, bottom_half)
+    print("done")
+    # cp.display_two_meshes(top_half, bottom_half)
     
 
 if __name__ == '__main__':
