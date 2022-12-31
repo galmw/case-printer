@@ -1,11 +1,16 @@
 import pybullet as p
 import pybullet_data
 import os
+import time
 
 
-def get_case_gravity_orientation(mesh_path):
+def get_case_gravity_orientation(mesh_path, show_gui=False):
     # Connect to the physics engine
-    p.connect(p.GUI)
+    if show_gui:
+        p.connect(p.GUI)
+    else:
+        p.connect(p.DIRECT)
+
     p.setGravity(0, 0, -10)
 
     # Load a plane as the ground
@@ -18,8 +23,14 @@ def get_case_gravity_orientation(mesh_path):
     os.remove(f'{mesh_path}.urdf')
 
     # Run the simulation for 10000 steps
-    for i in range(10000):
+    print("Running simulation for 10000 iterations, or 5 seconds..")
+
+    t = time.time()
+    i = 0
+    while time.time() - t < 10 and i < 10000:
         p.stepSimulation()
+        i += 1
+    print("Done simulating")
 
     position, orientation = p.getBasePositionAndOrientation(mesh_id)
 
