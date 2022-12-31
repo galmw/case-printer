@@ -1,7 +1,6 @@
 import pymesh
 import pyvista
 import numpy as np
-import quaternion
 from numpy.linalg import norm
 import os
 import math
@@ -12,56 +11,50 @@ from scipy.spatial.transform import Rotation
 class CasePrinter(object):
     _REFINEMENT_ORDER = 3
     
-    def __init__(self, mesh_path) -> None:
+    def __init__(self, mesh_path, output_dir='') -> None:
         self._mesh = pymesh.load_mesh(mesh_path)
-        # self._mesh = self.fix_mesh(self._mesh)
+        self._output_dir = output_dir
+        self._mesh = self.fix_mesh(self._mesh, detail='low')
 
-    def create_case(self, thickness=1) -> pymesh.Mesh:
-        # Compute the convex hull
+    def create_case(self, thickness=0.1, gravity_rotate=True) -> pymesh.Mesh:
         print("Comupting convex hull")
         # This might be useful someday: pymesh.compute_outer_hull(mesh)
         hull = pymesh.convex_hull(self._mesh)
 
-        self.save_mesh_to_stl(hull, "my_mesh.obj")
-        orientation = get_case_gravity_orientation('my_mesh')
-        hull = self.rotate_mesh(hull, orientation)
+        # Find the correct rotation via a physics simulation
+        if gravity_rotate:
+            hull = self.fix_mesh_rotation(hull)
 
         bigger_hull = self.get_outer_case(hull, thickness=thickness)
 
-        diff = pymesh.boolean(bigger_hull, hull, operation='difference') # There is some adjutment needed with some shifting of the bigger hull..
+        diff = pymesh.boolean(bigger_hull, hull, operation='difference')
         top_half, bottom_half = self.split_mesh_in_two(diff)
 
         return top_half, bottom_half
 
-    def rotate_mesh(self, mesh: pymesh.Mesh, orientation):
+
+    def fix_mesh_rotation(self, mesh: pymesh.Mesh):
+        temp_mesh_path = os.path.join(self._output_dir, 'temp_mesh.obj')
+        self.save_mesh_to_file(mesh, temp_mesh_path)
+        orientation = get_case_gravity_orientation(temp_mesh_path)
+        os.remove(temp_mesh_path)
+
         r = Rotation.from_quat(orientation)
         rotated_vertices = r.apply(mesh.vertices)
         rotated_mesh = pymesh.form_mesh(rotated_vertices, mesh.faces)
+
         return rotated_mesh
 
     def get_outer_case(self, mesh, thickness):
-        """
-        Option 1: Scale
-        Option 2: miknowski
-
-        sphere = pymesh.generate_icosphere(radius=1,
-                                           center=(0, 0, 0),
-                                           refinement_order=self._REFINEMENT_ORDER)
-        sphere_polyline = self.get_sphere_polyline(radius=thickness)
-        box = pymesh.generate_box_mesh((0,0,0), (1,1,1))
-        #outer_case = pymesh.minkowski_sum(mesh, box)
-        """
         center = (mesh.bbox[0] + mesh.bbox[1]) / 2
-        outer_case = pymesh.form_mesh(mesh.vertices * 1.1 - (center * 0.1), mesh.faces)
-        
-        return outer_case
+        new_vertices = mesh.vertices * (1 + thickness) - (center * thickness)
+        return pymesh.form_mesh(new_vertices, mesh.faces)
 
     def split_mesh_in_two(self, mesh: pymesh.Mesh):
         """
         1. Split the bouding box into two bounding boxes on top of each other.
         2. Intersect given mesh with a each half of the bouding box
         """
-        
         bottom, top = mesh.bbox[0], mesh.bbox[1]
         mid_height = (bottom[2] + top[2]) / 2
 
@@ -73,22 +66,8 @@ class CasePrinter(object):
 
         return top_half, bottom_half
     
-    def get_sphere_polyline(self, radius, points=6):
-        n = points
-        x, y, z = [], [], []
-        # Calculate the points on the sphere
-        for i in range(n):
-            for j in range(n):
-                # Calculate the coordinates
-                x.append(radius * math.sin(math.pi * i / n) * math.cos(2 * math.pi * j / n))
-                y.append(radius * math.sin(math.pi * i / n) * math.sin(2 * math.pi * j / n))
-                z.append(radius * math.cos(math.pi * i / n))
-
-        polyline = np.column_stack((x, y, z))
-        return polyline
-
     @staticmethod
-    def save_mesh_to_stl(mesh, output_path):
+    def save_mesh_to_file(mesh, output_path):
         print("Saving mesh")
         pymesh.save_mesh(output_path, mesh)
 
@@ -108,22 +87,16 @@ class CasePrinter(object):
         mesh.plot()
 
     def display_two_meshes(self, mesh1, mesh2, show_edges=False):
-        # pyvista.start_xvfb()
         plotter = pyvista.Plotter(shape=(1, 2))
 
-        # Note that the (0, 0) location is active by default
-        # load and plot an airplane on the left half of the screen
         plotter.add_text("Top Half", font_size=30)
         plotter.add_mesh(self._pymesh_to_pyvista(mesh1), show_edges=show_edges)
 
-        # load and plot the uniform data example on the right-hand side
         plotter.subplot(0, 1)
         plotter.add_text("Bottom half\n", font_size=30)
         plotter.add_mesh(self._pymesh_to_pyvista(mesh2), show_edges=show_edges)
-        # plotter.link_views()
-        # Display the window
+        # Optional - plotter.link_views()
         plotter.show()
-
 
     @staticmethod
     def fix_mesh(mesh, detail="normal"):
@@ -162,3 +135,24 @@ class CasePrinter(object):
         mesh, __ = pymesh.remove_isolated_vertices(mesh)
 
         return mesh
+
+    def get_sphere_polyline(self, radius, points=6):
+        """
+        This code is meant for using a minkowski sum with a sphere polyline.
+        sphere = pymesh.generate_icosphere(radius=1,
+                                           center=(0, 0, 0),
+                                           refinement_order=self._REFINEMENT_ORDER)
+        sphere_polyline = self.get_sphere_polyline(radius=thickness)
+        """
+        n = points
+        x, y, z = [], [], []
+        # Calculate the points on the sphere
+        for i in range(n):
+            for j in range(n):
+                # Calculate the coordinates
+                x.append(radius * math.sin(math.pi * i / n) * math.cos(2 * math.pi * j / n))
+                y.append(radius * math.sin(math.pi * i / n) * math.sin(2 * math.pi * j / n))
+                z.append(radius * math.cos(math.pi * i / n))
+
+        polyline = np.column_stack((x, y, z))
+        return polyline

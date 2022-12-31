@@ -1,3 +1,2 @@
 pyvista
 numpy
-numpy-quaternion

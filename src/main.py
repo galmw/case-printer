@@ -17,11 +17,11 @@ def main():
     if not os.path.exists(OUTPUT_DIR):
         os.mkdir(OUTPUT_DIR)
 
-    cp = CasePrinter(filename)
+    cp = CasePrinter(filename, output_dir=OUTPUT_DIR)
     top_half, bottom_half = cp.create_case()
 
-    cp.save_mesh_to_stl(top_half, top_output_filename)
-    cp.save_mesh_to_stl(bottom_half, bottom_output_filename)
+    cp.save_mesh_to_file(top_half, top_output_filename)
+    cp.save_mesh_to_file(bottom_half, bottom_output_filename)
     # cp.display_stl(output_filename)
     print("done")
     cp.display_two_meshes(top_half, bottom_half)

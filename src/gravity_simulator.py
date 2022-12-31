@@ -1,40 +1,33 @@
 import pybullet as p
 import pybullet_data
-import time
-import pymesh
+import os
 
 
-def get_case_gravity_orientation(mesh_name):
-    # Create URDF
-    write_urdf_text(mesh_name)
+def get_case_gravity_orientation(mesh_path):
     # Connect to the physics engine
-    physicsClient = p.connect(p.GUI)
-
-    # Set the gravity in the simulation
+    p.connect(p.GUI)
     p.setGravity(0, 0, -10)
 
     # Load a plane as the ground
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
-    planeId = p.loadURDF("plane.urdf")
+    p.loadURDF('plane.urdf')
 
-    # Load a box as the object
-    boxId = p.loadURDF(f"{mesh_name}.urdf", [0, 0, 2])
+    # Create URDF
+    create_urdf_from_template(mesh_path)
+    mesh_id = p.loadURDF(f'{mesh_path}.urdf', [0, 0, 2])
+    os.remove(f'{mesh_path}.urdf')
 
-    # Run the simulation for 100 steps
+    # Run the simulation for 10000 steps
     for i in range(10000):
         p.stepSimulation()
 
+    position, orientation = p.getBasePositionAndOrientation(mesh_id)
 
-    position, orientation = p.getBasePositionAndOrientation(boxId)
-
-    # Disconnect from the physics engine
     p.disconnect()
-    # orientation = p.getEulerFromQuaternion(orientation)
     return orientation
 
 
-def write_urdf_text(mesh_name):
-    print("Creation of <{}>...".format(mesh_name), end="")
+def create_urdf_from_template(mesh_name):
     with open('src/template.urdf', 'r') as template:
         template_text = template.read()
 
@@ -42,4 +35,3 @@ def write_urdf_text(mesh_name):
 
     with open(f"{mesh_name}.urdf", "w") as f:
         f.write(mesh_urdf)
-        print("done")
