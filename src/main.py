@@ -2,6 +2,8 @@ import argparse
 import os
 from case_printer import CasePrinter
 
+OUTPUT_DIR = 'output'
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -10,8 +12,10 @@ def main():
     filename = args.filename
 
     base, ext = os.path.splitext(filename)
-    top_output_filename = f'{base}_case_top{ext}'
-    bottom_output_filename = f'{base}_case_bottom{ext}'
+    top_output_filename = f'{OUTPUT_DIR}/{base}_case_top{ext}'
+    bottom_output_filename = f'{OUTPUT_DIR}/{base}_case_bottom{ext}'
+    if not os.path.exists(OUTPUT_DIR):
+        os.mkdir(OUTPUT_DIR)
 
     cp = CasePrinter(filename)
     top_half, bottom_half = cp.create_case()
@@ -20,7 +24,7 @@ def main():
     cp.save_mesh_to_stl(bottom_half, bottom_output_filename)
     # cp.display_stl(output_filename)
     print("done")
-    # cp.display_two_meshes(top_half, bottom_half)
+    cp.display_two_meshes(top_half, bottom_half)
     
 
 if __name__ == '__main__':

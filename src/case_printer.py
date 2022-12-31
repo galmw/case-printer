@@ -1,17 +1,20 @@
 import pymesh
 import pyvista
 import numpy as np
+import quaternion
 from numpy.linalg import norm
-import copy
 import os
 import math
+from gravity_simulator import get_case_gravity_orientation
+from scipy.spatial.transform import Rotation
 
 
 class CasePrinter(object):
     _REFINEMENT_ORDER = 3
+    
     def __init__(self, mesh_path) -> None:
         self._mesh = pymesh.load_mesh(mesh_path)
-        self._mesh = self.fix_mesh(self._mesh)
+        # self._mesh = self.fix_mesh(self._mesh)
 
     def create_case(self, thickness=1) -> pymesh.Mesh:
         # Compute the convex hull
@@ -19,12 +22,22 @@ class CasePrinter(object):
         # This might be useful someday: pymesh.compute_outer_hull(mesh)
         hull = pymesh.convex_hull(self._mesh)
 
+        self.save_mesh_to_stl(hull, "my_mesh.obj")
+        orientation = get_case_gravity_orientation('my_mesh')
+        hull = self.rotate_mesh(hull, orientation)
+
         bigger_hull = self.get_outer_case(hull, thickness=thickness)
 
         diff = pymesh.boolean(bigger_hull, hull, operation='difference') # There is some adjutment needed with some shifting of the bigger hull..
         top_half, bottom_half = self.split_mesh_in_two(diff)
 
         return top_half, bottom_half
+
+    def rotate_mesh(self, mesh: pymesh.Mesh, orientation):
+        r = Rotation.from_quat(orientation)
+        rotated_vertices = r.apply(mesh.vertices)
+        rotated_mesh = pymesh.form_mesh(rotated_vertices, mesh.faces)
+        return rotated_mesh
 
     def get_outer_case(self, mesh, thickness):
         """
