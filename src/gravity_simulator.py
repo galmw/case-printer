@@ -4,6 +4,8 @@ import os
 import time
 
 
+NUM_SIMULATION_STEPS = 20000
+
 def get_case_gravity_orientation(mesh_path, show_gui=False):
     # Connect to the physics engine
     if show_gui:
@@ -22,12 +24,12 @@ def get_case_gravity_orientation(mesh_path, show_gui=False):
     mesh_id = p.loadURDF(f'{mesh_path}.urdf', [0, 0, 2])
     os.remove(f'{mesh_path}.urdf')
 
-    # Run the simulation for 10000 steps
-    print("Running simulation for 10000 iterations, or 5 seconds..")
+    # Run the simulation for NUM_SIMULATION_STEPS steps
+    print(f'Running simulation for {NUM_SIMULATION_STEPS} iterations, or 5 seconds..')
 
     t = time.time()
     i = 0
-    while time.time() - t < 10 and i < 10000:
+    while time.time() - t < 10 and i < NUM_SIMULATION_STEPS:
         p.stepSimulation()
         i += 1
     print("Done simulating")

@@ -23,7 +23,7 @@ class CasePrinter(object):
 
         # Find the correct rotation via a physics simulation
         if gravity_rotate:
-            hull = self.fix_mesh_rotation(hull)
+            hull = self.gravity_rotate_mesh(hull)
 
         bigger_hull = self.get_outer_case(hull, thickness=thickness)
 
@@ -32,8 +32,7 @@ class CasePrinter(object):
 
         return top_half, bottom_half
 
-
-    def fix_mesh_rotation(self, mesh: pymesh.Mesh):
+    def gravity_rotate_mesh(self, mesh: pymesh.Mesh):
         temp_mesh_path = os.path.join(self._output_dir, 'temp_mesh.obj')
         self.save_mesh_to_file(mesh, temp_mesh_path)
         orientation = get_case_gravity_orientation(temp_mesh_path)
