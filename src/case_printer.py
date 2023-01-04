@@ -16,18 +16,18 @@ class CasePrinter(object):
         self._output_dir = output_dir
         self._mesh = self.fix_mesh(self._mesh, detail='low')
 
-    def create_case(self, thickness=0.1, gravity_rotate=True) -> pymesh.Mesh:
+    def create_case(self, thickness=0.1, space=0.05, gravity_rotate=True) -> pymesh.Mesh:
         print("Comupting convex hull")
-        # This might be useful someday: pymesh.compute_outer_hull(mesh)
         hull = pymesh.convex_hull(self._mesh)
 
         # Find the correct rotation via a physics simulation
         if gravity_rotate:
             hull = self.gravity_rotate_mesh(hull)
 
-        bigger_hull = self.get_outer_case(hull, thickness=thickness)
+        case_outer_hull = self.get_resized_mesh(hull, size_increase=(thickness + space))
+        case_inner_hull = self.get_resized_mesh(hull, size_increase=space)
 
-        diff = pymesh.boolean(bigger_hull, hull, operation='difference')
+        diff = pymesh.boolean(case_outer_hull, case_inner_hull, operation='difference')
         top_half, bottom_half = self.split_mesh_in_two(diff)
 
         return top_half, bottom_half
@@ -44,9 +44,9 @@ class CasePrinter(object):
 
         return rotated_mesh
 
-    def get_outer_case(self, mesh, thickness):
+    def get_resized_mesh(self, mesh, size_increase):
         center = (mesh.bbox[0] + mesh.bbox[1]) / 2
-        new_vertices = mesh.vertices * (1 + thickness) - (center * thickness)
+        new_vertices = mesh.vertices * (1 + size_increase) - (center * size_increase)
         return pymesh.form_mesh(new_vertices, mesh.faces)
 
     def split_mesh_in_two(self, mesh: pymesh.Mesh):
