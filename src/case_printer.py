@@ -30,8 +30,9 @@ class CasePrinter(object):
 
         diff = pymesh.boolean(case_outer_hull, case_inner_hull, operation='difference')
         bottom_half, top_half = self.split_mesh_in_two(diff)
+        bottom_interior, top_interior = self.split_mesh_in_two(case_inner_hull)
 
-        hc = HingeCreator(bottom_half, top_half)
+        hc = HingeCreator(bottom_half, top_half, bottom_interior, top_interior)
         hc.rotate_meshes_hinge()
         hc.connect_sock()
         # hc.connect_hinge()

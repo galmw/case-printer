@@ -6,14 +6,21 @@ from scipy.spatial.transform import Rotation
 
 
 class HingeCreator(object):
-    def __init__(self, bottom_half, top_half) -> None:
+    SOCK = pymesh.load_mesh(os.path.join('src','socket.stl'))
+
+    def __init__(self, bottom_half, top_half, bottom_interior, top_interior) -> None:
         """
         Contains all the logic to transform the halves into halves with a hinge and socket that will connect them.
         """
         self.bottom_half = bottom_half
         self.top_half = top_half
+        self.bottom_interior = bottom_interior
+        self.top_interior = top_interior
 
     def rotate_meshes_hinge(self):
+        """
+        Find the correct rotation to apply the hinge to.
+        """
         slice = pymesh.slice_mesh(self.bottom_half, np.array([0.0, 0.0, 1.0]), 1)[0]
 
         points_2d = np.ndarray(shape=(len(slice.vertices), 2))
@@ -76,20 +83,45 @@ class HingeCreator(object):
         spatial_rotation_matrix[1][0] = r[1][0]
         spatial_rotation_matrix[1][1] = r[1][1]
 
+        self.bottom_half = self.rotate_mesh_by_matrix(self.bottom_half, spatial_rotation_matrix)
+        self.top_half = self.rotate_mesh_by_matrix(self.top_half, spatial_rotation_matrix)
+        self.bottom_interior = self.rotate_mesh_by_matrix(self.bottom_interior, spatial_rotation_matrix)
+        self.top_interior = self.rotate_mesh_by_matrix(self.top_interior, spatial_rotation_matrix)
+    
+    @staticmethod
+    def rotate_mesh_by_matrix(mesh, spatial_rotation_matrix):
         r = Rotation.from_matrix(spatial_rotation_matrix)
-        rotated_vertices = r.apply(self.bottom_half.vertices)
-        self.bottom_half = pymesh.form_mesh(rotated_vertices, self.bottom_half.faces)
+        rotated_vertices = r.apply(mesh.vertices)
+        return pymesh.form_mesh(rotated_vertices, mesh.faces)
 
     def connect_sock(self):
-        sock = pymesh.load_mesh(os.path.join('src','socket.stl'))
         mesh = self.bottom_half
         
+        # For the x axis - place in the middle
+        # For the y axis - place outside of the inner hull
+        # For the z axis - place inside the edge
+        """
+        "Outer" option:
         mesh_placement_point = np.array([(mesh.bbox[0][0] + mesh.bbox[1][0]) / 2,  mesh.bbox[1][1], mesh.bbox[1][2]])
         sock_connection_point = np.array([(sock.bbox[0][0] + sock.bbox[1][0]) / 2, sock.bbox[0][1], sock.bbox[0][2]])
+        """
+        mesh_placement_point = np.array([(mesh.bbox[0][0] + mesh.bbox[1][0]) / 2,  self.bottom_interior.bbox[1][1], mesh.bbox[1][2]])
+        sock_connection_point = np.array([(self.SOCK.bbox[0][0] + self.SOCK.bbox[1][0]) / 2, self.SOCK.bbox[0][1], self.SOCK.bbox[1][2]])
+        
+        sock = pymesh.form_mesh(self.SOCK.vertices + (mesh_placement_point - sock_connection_point), self.SOCK.faces)
 
-        moved_sock = pymesh.form_mesh(sock.vertices + (mesh_placement_point - sock_connection_point), sock.faces)
+        # Remove the convex hull of the sock, to create room for the hinge
+        width = (sock.bbox[1][1] - sock.bbox[0][1]) / 2
 
-        self.bottom_half = pymesh.boolean(mesh, moved_sock, operation='union')
+        sock_hull = pymesh.convex_hull(sock)
+        mesh = pymesh.boolean(mesh, sock_hull, operation='difference')
+
+        
+        sock_box = pymesh.generate_box_mesh(sock.bbox[0], sock.bbox[1])
+        sock_box_inside = pymesh.form_mesh(sock_box.vertices - np.array([0, width, 0]), sock_box.faces)
+        mesh = pymesh.boolean(mesh, sock_box_inside, operation='difference')
+        #mesh = pymesh.boolean(mesh, sock_hull, operation='difference')
+        self.bottom_half = pymesh.boolean(mesh, sock, operation='union')
 
     def create_hinge(self):
         radius = 1
