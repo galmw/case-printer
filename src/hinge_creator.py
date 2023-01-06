@@ -65,10 +65,8 @@ class HingeCreator(object):
         best_idx = np.argmin(areas)
 
         # return the best box
-        x1 = max_x[best_idx]
-        x2 = min_x[best_idx]
-        y1 = max_y[best_idx]
-        y2 = min_y[best_idx]
+        x1, y1 = max_x[best_idx], max_y[best_idx]
+        x2, y2 = min_x[best_idx], min_y[best_idx]
         r = rotations[best_idx]        
 
         # Rotate to align to larger edge of the bounding box
@@ -94,8 +92,21 @@ class HingeCreator(object):
         rotated_vertices = r.apply(mesh.vertices)
         return pymesh.form_mesh(rotated_vertices, mesh.faces)
 
+    def scale_hinge(self):
+        # Scale by the X axis of the bounding box of the case
+        #if self.bottom_half.dim
+        max_case_width = (self.bottom_half.bbox[1][0] - self.bottom_half.bbox[0][0]) * 0.8
+        print(f'Case width: {max_case_width}')
+        sock_width = self.SOCK.bbox[1][0] - self.SOCK.bbox[0][0]
+        if sock_width > max_case_width:
+            print("Scaling hinge to match case")
+            scale = max_case_width / sock_width
+            self.SOCK = pymesh.form_mesh(self.SOCK.vertices * scale, self.SOCK.faces)
+        print(f'Hinge width: {sock_width}')
+
     def connect_sock(self):
         mesh = self.bottom_half
+        self.scale_hinge()
         
         # For the x axis - place in the middle
         # For the y axis - place outside of the inner hull
@@ -110,19 +121,25 @@ class HingeCreator(object):
         
         sock = pymesh.form_mesh(self.SOCK.vertices + (mesh_placement_point - sock_connection_point), self.SOCK.faces)
 
+        sock1, sock2 = pymesh.separate_mesh(sock)
+
         # Remove the convex hull of the sock, to create room for the hinge
         width = (sock.bbox[1][1] - sock.bbox[0][1]) / 2
 
         sock_hull = pymesh.convex_hull(sock)
-        mesh = pymesh.boolean(mesh, sock_hull, operation='difference')
+        mesh = pymesh.boolean(mesh, sock_hull, operation='difference') # Remove the hull 
 
         
         sock_box = pymesh.generate_box_mesh(sock.bbox[0], sock.bbox[1])
         sock_box_inside = pymesh.form_mesh(sock_box.vertices - np.array([0, width, 0]), sock_box.faces)
+        
         mesh = pymesh.boolean(mesh, sock_box_inside, operation='difference')
         #mesh = pymesh.boolean(mesh, sock_hull, operation='difference')
         self.bottom_half = pymesh.boolean(mesh, sock, operation='union')
 
+
+
+    """
     def create_hinge(self):
         radius = 1
         bottom_center = np.ndarray([0,0,0])
@@ -132,3 +149,4 @@ class HingeCreator(object):
         top_sphere = pymesh.generate_icosphere(radius * 0.8, top_center)
         hinge = pymesh.boolean(cylinder, pymesh.boolean(top_sphere, bottom_sphere, operation='union'))
         return hinge
+    """

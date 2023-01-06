@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "src/main.py",
             "console": "integratedTerminal",
-            "args": ["scans/perfume.stl"],
+            "args": ["scans/glasses.stl"],
             "justMyCode": true
         }
     ]
