@@ -18,13 +18,14 @@ def main():
         os.mkdir(OUTPUT_DIR)
 
     cp = CasePrinter(filename, output_dir=OUTPUT_DIR)
-    top_half, bottom_half = cp.create_case()
+    bottom_half, top_half = cp.create_case()
 
-    cp.save_mesh_to_file(top_half, top_output_filename)
     cp.save_mesh_to_file(bottom_half, bottom_output_filename)
+    cp.save_mesh_to_file(top_half, top_output_filename)
     # cp.display_stl(output_filename)
+
     print("done")
-    cp.display_two_meshes(top_half, bottom_half)
+    cp.display_two_meshes(bottom_half, top_half)
     
 
 if __name__ == '__main__':

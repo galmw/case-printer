@@ -6,6 +6,7 @@ import os
 import math
 from gravity_simulator import get_case_gravity_orientation
 from scipy.spatial.transform import Rotation
+from hinge_creator import HingeCreator
 
 
 class CasePrinter(object):
@@ -28,9 +29,14 @@ class CasePrinter(object):
         case_inner_hull = self.get_resized_mesh(hull, size_increase=space)
 
         diff = pymesh.boolean(case_outer_hull, case_inner_hull, operation='difference')
-        top_half, bottom_half = self.split_mesh_in_two(diff)
+        bottom_half, top_half = self.split_mesh_in_two(diff)
 
-        return top_half, bottom_half
+        hc = HingeCreator(bottom_half, top_half)
+        hc.rotate_meshes_hinge()
+        hc.connect_sock()
+        # hc.connect_hinge()
+
+        return hc.bottom_half, hc.top_half
 
     def gravity_rotate_mesh(self, mesh: pymesh.Mesh):
         temp_mesh_path = os.path.join(self._output_dir, 'temp_mesh.obj')
@@ -57,13 +63,13 @@ class CasePrinter(object):
         bottom, top = mesh.bbox[0], mesh.bbox[1]
         mid_height = (bottom[2] + top[2]) / 2
 
-        top_box = pymesh.generate_box_mesh(bottom, (top[0], top[1], mid_height))
-        bottom_box = pymesh.generate_box_mesh((bottom[0], bottom[1], mid_height), top)
+        bottom_box = pymesh.generate_box_mesh(bottom, (top[0], top[1], mid_height))
+        top_box = pymesh.generate_box_mesh((bottom[0], bottom[1], mid_height), top)
         
-        top_half = pymesh.boolean(mesh, top_box, operation='intersection')
         bottom_half = pymesh.boolean(mesh, bottom_box, operation='intersection')
+        top_half = pymesh.boolean(mesh, top_box, operation='intersection')
 
-        return top_half, bottom_half
+        return bottom_half, top_half
     
     @staticmethod
     def save_mesh_to_file(mesh, output_path):
@@ -88,11 +94,11 @@ class CasePrinter(object):
     def display_two_meshes(self, mesh1, mesh2, show_edges=False):
         plotter = pyvista.Plotter(shape=(1, 2))
 
-        plotter.add_text("Top Half", font_size=30)
+        plotter.add_text("Bottom Half", font_size=30)
         plotter.add_mesh(self._pymesh_to_pyvista(mesh1), show_edges=show_edges)
 
         plotter.subplot(0, 1)
-        plotter.add_text("Bottom half\n", font_size=30)
+        plotter.add_text("Top half\n", font_size=30)
         plotter.add_mesh(self._pymesh_to_pyvista(mesh2), show_edges=show_edges)
         # Optional - plotter.link_views()
         plotter.show()
