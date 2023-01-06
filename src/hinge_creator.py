@@ -6,7 +6,10 @@ from scipy.spatial.transform import Rotation
 
 
 class HingeCreator(object):
-    SOCK = pymesh.load_mesh(os.path.join('src','socket.stl'))
+    SOCK = pymesh.load_mesh(os.path.join('src', 'socket.stl'))
+    HINGE = pymesh.load_mesh(os.path.join('src', 'hinge.stl'))
+
+    MAX_SCALE = 0.6
 
     def __init__(self, bottom_half, top_half, bottom_interior, top_interior) -> None:
         """
@@ -94,59 +97,59 @@ class HingeCreator(object):
 
     def scale_hinge(self):
         # Scale by the X axis of the bounding box of the case
-        #if self.bottom_half.dim
-        max_case_width = (self.bottom_half.bbox[1][0] - self.bottom_half.bbox[0][0]) * 0.8
+
+        max_case_width = (self.bottom_half.bbox[1][0] - self.bottom_half.bbox[0][0]) * self.MAX_SCALE
         print(f'Case width: {max_case_width}')
         sock_width = self.SOCK.bbox[1][0] - self.SOCK.bbox[0][0]
         if sock_width > max_case_width:
             print("Scaling hinge to match case")
             scale = max_case_width / sock_width
             self.SOCK = pymesh.form_mesh(self.SOCK.vertices * scale, self.SOCK.faces)
+            self.HINGE = pymesh.form_mesh(self.HINGE.vertices * scale, self.HINGE.faces)
+
         print(f'Hinge width: {sock_width}')
 
-    def connect_sock(self):
-        mesh = self.bottom_half
-        self.scale_hinge()
-        
-        # For the x axis - place in the middle
-        # For the y axis - place outside of the inner hull
-        # For the z axis - place inside the edge
-        """
-        "Outer" option:
-        mesh_placement_point = np.array([(mesh.bbox[0][0] + mesh.bbox[1][0]) / 2,  mesh.bbox[1][1], mesh.bbox[1][2]])
-        sock_connection_point = np.array([(sock.bbox[0][0] + sock.bbox[1][0]) / 2, sock.bbox[0][1], sock.bbox[0][2]])
-        """
-        mesh_placement_point = np.array([(mesh.bbox[0][0] + mesh.bbox[1][0]) / 2,  self.bottom_interior.bbox[1][1], mesh.bbox[1][2]])
-        sock_connection_point = np.array([(self.SOCK.bbox[0][0] + self.SOCK.bbox[1][0]) / 2, self.SOCK.bbox[0][1], self.SOCK.bbox[1][2]])
-        
-        sock = pymesh.form_mesh(self.SOCK.vertices + (mesh_placement_point - sock_connection_point), self.SOCK.faces)
+    @property
+    def hinge_connection_point(self):
+        return np.array([(self.HINGE.bbox[0][0] + self.HINGE.bbox[1][0]) / 2,
+                          self.HINGE.bbox[0][1], self.HINGE.bbox[1][2]])
 
-        sock1, sock2 = pymesh.separate_mesh(sock)
+    @property
+    def sock_connection_point(self):
+        return np.array([(self.SOCK.bbox[0][0] + self.SOCK.bbox[1][0]) / 2,
+                          self.SOCK.bbox[0][1], self.SOCK.bbox[1][2]])
+    
+    def get_x_placement_point(self):
+        return (self.bottom_half.bbox[0][0] + self.bottom_half.bbox[1][0]) / 2
 
-        # Remove the convex hull of the sock, to create room for the hinge
-        width = (sock.bbox[1][1] - sock.bbox[0][1]) / 2
+    def get_hinge(self):
+        mesh_placement_point = np.array(
+            [self.get_x_placement_point(), self.bottom_interior.bbox[1][1], self.top_half.bbox[0][2]])
 
-        sock_hull = pymesh.convex_hull(sock)
-        mesh = pymesh.boolean(mesh, sock_hull, operation='difference') # Remove the hull 
-
-        
-        sock_box = pymesh.generate_box_mesh(sock.bbox[0], sock.bbox[1])
-        sock_box_inside = pymesh.form_mesh(sock_box.vertices - np.array([0, width, 0]), sock_box.faces)
-        
-        mesh = pymesh.boolean(mesh, sock_box_inside, operation='difference')
-        #mesh = pymesh.boolean(mesh, sock_hull, operation='difference')
-        self.bottom_half = pymesh.boolean(mesh, sock, operation='union')
-
-
-
-    """
-    def create_hinge(self):
-        radius = 1
-        bottom_center = np.ndarray([0,0,0])
-        top_center = np.ndarray([0,0,5])
-        cylinder = pymesh.generate_cylinder(bottom_center, top_center, radius, radius, num_segments=50)
-        bottom_sphere = pymesh.generate_icosphere(radius * 0.8, bottom_center)
-        top_sphere = pymesh.generate_icosphere(radius * 0.8, top_center)
-        hinge = pymesh.boolean(cylinder, pymesh.boolean(top_sphere, bottom_sphere, operation='union'))
+        hinge = pymesh.form_mesh(self.HINGE.vertices + (mesh_placement_point - self.hinge_connection_point), self.HINGE.faces)
         return hinge
-    """
+    
+    def get_sock(self):                
+        """
+        For the x axis - place in the middle
+        For the y axis - place outside of the inner hull
+        For the z axis - place inside the edge
+        """
+        mesh_placement_point = np.array(
+            [self.get_x_placement_point(),  self.bottom_interior.bbox[1][1], self.bottom_half.bbox[1][2]])
+        
+        sock = pymesh.form_mesh(self.SOCK.vertices + (mesh_placement_point - self.sock_connection_point), self.SOCK.faces)
+        return sock
+
+    def connect_sock(self):
+        # First we must clear the path for the socket to exist on the edge of the case.
+        hinge_bbox = self.get_hinge().bbox
+        inner_y_value = (self.bottom_interior.bbox[0][1] + self.bottom_interior.bbox[1][1]) / 2
+        extra_bbox_x = np.array([hinge_bbox[0][0], inner_y_value, hinge_bbox[0][2]])
+        hinge_box = pymesh.generate_box_mesh(extra_bbox_x, hinge_bbox[1])
+
+        self.bottom_half = pymesh.boolean(self.bottom_half, hinge_box, operation='difference')
+        self.bottom_half = pymesh.boolean(self.bottom_half, self.get_sock(), operation='union')
+
+    def connect_hinge(self):
+        self.top_half = pymesh.boolean(self.top_half, self.get_hinge(), operation='union')

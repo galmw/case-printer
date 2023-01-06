@@ -34,8 +34,9 @@ class CasePrinter(object):
 
         hc = HingeCreator(bottom_half, top_half, bottom_interior, top_interior)
         hc.rotate_meshes_hinge()
+        hc.scale_hinge()
         hc.connect_sock()
-        # hc.connect_hinge()
+        hc.connect_hinge()
 
         return hc.bottom_half, hc.top_half
 

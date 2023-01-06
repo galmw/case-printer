@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "src/main.py",
             "console": "integratedTerminal",
-            "args": ["scans/glasses.stl"],
+            "args": ["scans/airpods.stl"],
             "justMyCode": true
         }
     ]
