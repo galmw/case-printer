@@ -6,7 +6,8 @@ from scipy.spatial.transform import Rotation
 
 
 class HingeCreator(object):
-    SOCK = pymesh.load_mesh(os.path.join('src','socket.stl'))
+    SOCK = pymesh.load_mesh(os.path.join('src', 'socket.stl'))
+    HINGE = pymesh.load_mesh(os.path.join('src', 'hinge.stl'))
 
     def __init__(self, bottom_half, top_half, bottom_interior, top_interior) -> None:
         """
@@ -122,6 +123,19 @@ class HingeCreator(object):
         mesh = pymesh.boolean(mesh, sock_box_inside, operation='difference')
         #mesh = pymesh.boolean(mesh, sock_hull, operation='difference')
         self.bottom_half = pymesh.boolean(mesh, sock, operation='union')
+
+    def connect_hinge(self):
+        mesh = self.top_half
+
+        mesh_placement_point = np.array(
+            [(mesh.bbox[0][0] + mesh.bbox[1][0]) / 2, self.bottom_interior.bbox[1][1], mesh.bbox[0][2]])
+        hinge_connection_point = np.array(
+            [(self.HINGE.bbox[0][0] + self.HINGE.bbox[1][0]) / 2, self.HINGE.bbox[0][1], self.HINGE.bbox[1][2]])
+
+        hinge = pymesh.form_mesh(self.HINGE.vertices + (mesh_placement_point - hinge_connection_point), self.HINGE.faces)
+
+        self.top_half = pymesh.boolean(mesh, hinge, operation='union')
+
 
     def create_hinge(self):
         radius = 1
