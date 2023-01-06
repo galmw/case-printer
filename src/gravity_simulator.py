@@ -21,7 +21,7 @@ def get_case_gravity_orientation(mesh_path, show_gui=False):
 
     # Create URDF
     create_urdf_from_template(mesh_path)
-    mesh_id = p.loadURDF(f'{mesh_path}.urdf', [0, 0, 2])
+    mesh_id = p.loadURDF(f'{mesh_path}.urdf', [0, 0, 50])
     os.remove(f'{mesh_path}.urdf')
 
     # Run the simulation for NUM_SIMULATION_STEPS steps
@@ -32,6 +32,8 @@ def get_case_gravity_orientation(mesh_path, show_gui=False):
     while time.time() - t < 10 and i < NUM_SIMULATION_STEPS:
         p.stepSimulation()
         i += 1
+        if show_gui:
+            time.sleep(0.01)
     print("Done simulating")
 
     position, orientation = p.getBasePositionAndOrientation(mesh_id)

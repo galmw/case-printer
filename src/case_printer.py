@@ -10,8 +10,6 @@ from hinge_creator import HingeCreator
 
 
 class CasePrinter(object):
-    _REFINEMENT_ORDER = 3
-    
     def __init__(self, mesh_path, output_dir='') -> None:
         self._mesh = pymesh.load_mesh(mesh_path)
         self._output_dir = output_dir
@@ -38,12 +36,15 @@ class CasePrinter(object):
         hc.connect_sock()
         hc.connect_hinge()
 
+        pymesh.merge_meshes([hc.bottom_half, hc.top_half])
+        # self.gravity_rotate_mesh(pymesh.merge_meshes([hc.bottom_half, hc.top_half]), show_gui=True)
+
         return hc.bottom_half, hc.top_half
 
-    def gravity_rotate_mesh(self, mesh: pymesh.Mesh):
+    def gravity_rotate_mesh(self, mesh: pymesh.Mesh, show_gui=False):
         temp_mesh_path = os.path.join(self._output_dir, 'temp_mesh.obj')
         self.save_mesh_to_file(mesh, temp_mesh_path)
-        orientation = get_case_gravity_orientation(temp_mesh_path)
+        orientation = get_case_gravity_orientation(temp_mesh_path, show_gui=show_gui)
         os.remove(temp_mesh_path)
 
         r = Rotation.from_quat(orientation)

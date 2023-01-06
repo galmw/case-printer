@@ -22,9 +22,8 @@ def main():
 
     cp.save_mesh_to_file(bottom_half, bottom_output_filename)
     cp.save_mesh_to_file(top_half, top_output_filename)
-    # cp.display_stl(output_filename)
 
-    print("done")
+    print("Done")
     cp.display_two_meshes(bottom_half, top_half)
     
 

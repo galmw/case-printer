@@ -1,6 +1,7 @@
 import pymesh
 import os
 import numpy as np
+import math
 from scipy.spatial import ConvexHull
 from scipy.spatial.transform import Rotation
 
@@ -119,12 +120,27 @@ class HingeCreator(object):
         return np.array([(self.SOCK.bbox[0][0] + self.SOCK.bbox[1][0]) / 2,
                           self.SOCK.bbox[0][1], self.SOCK.bbox[1][2]])
     
-    def get_x_placement_point(self):
+    def get_x_placement_value(self):
         return (self.bottom_half.bbox[0][0] + self.bottom_half.bbox[1][0]) / 2
+
+    def get_y_placement_value(self):
+        """
+        Start at the edge of the bottom bounding box, and then make sure the distance is zero.
+        """
+        desired_y = self.bottom_interior.bbox[1][1]
+
+        """
+        slice = pymesh.slice_mesh(self.bottom_interior, np.array([0, 0, 1]), 1)[0]
+        desired_y = slice.bbox[1][1]
+        desired_point = np.array([self.get_x_placement_value(), desired_y, self.bottom_half.bbox[1][2]]).reshape(1,3)
+        extra_distance_needed = math.sqrt(pymesh.distance_to_mesh(self.bottom_interior, desired_point)[0])
+        """
+        extra_distance_needed = 0
+        return desired_y - extra_distance_needed
 
     def get_hinge(self):
         mesh_placement_point = np.array(
-            [self.get_x_placement_point(), self.bottom_interior.bbox[1][1], self.top_half.bbox[0][2]])
+            [self.get_x_placement_value(), self.get_y_placement_value(), self.top_half.bbox[0][2]])
 
         hinge = pymesh.form_mesh(self.HINGE.vertices + (mesh_placement_point - self.hinge_connection_point), self.HINGE.faces)
         return hinge
@@ -136,7 +152,7 @@ class HingeCreator(object):
         For the z axis - place inside the edge
         """
         mesh_placement_point = np.array(
-            [self.get_x_placement_point(),  self.bottom_interior.bbox[1][1], self.bottom_half.bbox[1][2]])
+            [self.get_x_placement_value(), self.get_y_placement_value(), self.bottom_half.bbox[1][2]])
         
         sock = pymesh.form_mesh(self.SOCK.vertices + (mesh_placement_point - self.sock_connection_point), self.SOCK.faces)
         return sock
@@ -152,4 +168,15 @@ class HingeCreator(object):
         self.bottom_half = pymesh.boolean(self.bottom_half, self.get_sock(), operation='union')
 
     def connect_hinge(self):
+        sock = self.get_sock()
+        height = (sock.bbox[1][2] - sock.bbox[0][2]) / 3
+        
+        sock1, sock2 = pymesh.separate_mesh(sock)
+        sock1 = pymesh.convex_hull(sock1)
+        sock2 = pymesh.convex_hull(sock2)
+        upper_sock = pymesh.merge_meshes([sock1, sock2])
+        upper_sock = pymesh.form_mesh(upper_sock.vertices + np.array([0, 0, height]), upper_sock.faces)
+
+        #upper_sock = pymesh.form_mesh(sock.vertices + np.array([0, 0, height]), sock.faces)
+        self.top_half = pymesh.boolean(self.top_half, upper_sock, operation='difference')
         self.top_half = pymesh.boolean(self.top_half, self.get_hinge(), operation='union')
