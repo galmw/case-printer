@@ -10,7 +10,7 @@ class HingeCreator(object):
     SOCK = pymesh.load_mesh(os.path.join('src', 'socket.stl'))
     HINGE = pymesh.load_mesh(os.path.join('src', 'hinge.stl'))
 
-    MAX_SCALE = 0.6
+    MAX_HINGE_SCALE = 0.6
 
     def __init__(self, bottom_half, top_half, bottom_interior, top_interior) -> None:
         """
@@ -94,12 +94,14 @@ class HingeCreator(object):
 
     def scale_hinge(self):
         # Scale by the X axis of the bounding box of the case
-        max_case_width = (self.bottom_half.bbox[1][0] - self.bottom_half.bbox[0][0]) * self.MAX_SCALE
-        print(f'Case width: {max_case_width}')
+        case_width = self.bottom_half.bbox[1][0] - self.bottom_half.bbox[0][0]
         sock_width = self.SOCK.bbox[1][0] - self.SOCK.bbox[0][0]
-        if sock_width > max_case_width:
+        print(f'Case width: {case_width}')
+        max_sock_width = case_width * self.MAX_HINGE_SCALE
+        
+        if sock_width > max_sock_width:
             print("Scaling hinge to match case")
-            scale = max_case_width / sock_width
+            scale = max_sock_width / sock_width
             self.SOCK = pymesh.form_mesh(self.SOCK.vertices * scale, self.SOCK.faces)
             self.HINGE = pymesh.form_mesh(self.HINGE.vertices * scale, self.HINGE.faces)
             sock_width *= scale

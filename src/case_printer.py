@@ -15,7 +15,7 @@ class CasePrinter(object):
         self._output_dir = output_dir
         self._mesh = self.fix_mesh(self._mesh, detail='low')
 
-    def create_case(self, thickness=0.1, space=0.05, gravity_rotate=True) -> pymesh.Mesh:
+    def create_case(self, thickness=0.1, space=0.05, use_minkowski_sum=False, gravity_rotate=True) -> pymesh.Mesh:
         print("Comupting convex hull")
         hull = pymesh.convex_hull(self._mesh)
 
@@ -23,9 +23,14 @@ class CasePrinter(object):
         if gravity_rotate:
             hull = self.gravity_rotate_mesh(hull)
 
-        case_outer_hull = self.get_resized_mesh(hull, size_increase=(thickness + space))
         case_inner_hull = self.get_resized_mesh(hull, size_increase=space)
 
+        if use_minkowski_sum:
+            print("Calculating mikowski sum..")
+            case_outer_hull = pymesh.minkowski_sum(case_inner_hull, self.get_sphere_polyline(3, refinment_order=1))
+        else:
+            case_outer_hull = self.get_resized_mesh(hull, size_increase=(thickness + space))
+        
         diff = pymesh.boolean(case_outer_hull, case_inner_hull, operation='difference')
         bottom_half, top_half = self.split_mesh_in_two(diff)
         bottom_interior, top_interior = self.split_mesh_in_two(case_inner_hull)
@@ -35,9 +40,6 @@ class CasePrinter(object):
         hc.scale_hinge()
         hc.connect_sock()
         hc.connect_hinge()
-
-        pymesh.merge_meshes([hc.bottom_half, hc.top_half])
-        # self.gravity_rotate_mesh(pymesh.merge_meshes([hc.bottom_half, hc.top_half]), show_gui=True)
 
         return hc.bottom_half, hc.top_half
 
@@ -53,12 +55,14 @@ class CasePrinter(object):
 
         return rotated_mesh
 
-    def get_resized_mesh(self, mesh, size_increase):
+    @staticmethod
+    def get_resized_mesh(mesh, size_increase):
         center = (mesh.bbox[0] + mesh.bbox[1]) / 2
         new_vertices = mesh.vertices * (1 + size_increase) - (center * size_increase)
         return pymesh.form_mesh(new_vertices, mesh.faces)
 
-    def split_mesh_in_two(self, mesh: pymesh.Mesh):
+    @staticmethod
+    def split_mesh_in_two(mesh: pymesh.Mesh):
         """
         1. Split the bouding box into two bounding boxes on top of each other.
         2. Intersect given mesh with a each half of the bouding box
@@ -116,7 +120,7 @@ class CasePrinter(object):
             target_len = diag_len * 2.5e-3
         elif detail == "low":
             target_len = diag_len * 1e-2
-        print("Target resolution: {} mm".format(target_len))
+        print("Target mesh resolution: {} mm".format(target_len))
 
         count = 0
         mesh, __ = pymesh.remove_degenerated_triangles(mesh, 100)
@@ -131,7 +135,7 @@ class CasePrinter(object):
                 break
 
             num_vertices = mesh.num_vertices
-            print("#v: {}".format(num_vertices))
+            print("# Vertices: {}".format(num_vertices))
             count += 1
             if count > 10: break
 
@@ -144,23 +148,8 @@ class CasePrinter(object):
 
         return mesh
 
-    def get_sphere_polyline(self, radius, points=6):
-        """
-        This code is meant for using a minkowski sum with a sphere polyline.
-        sphere = pymesh.generate_icosphere(radius=1,
-                                           center=(0, 0, 0),
-                                           refinement_order=self._REFINEMENT_ORDER)
-        sphere_polyline = self.get_sphere_polyline(radius=thickness)
-        """
-        n = points
-        x, y, z = [], [], []
-        # Calculate the points on the sphere
-        for i in range(n):
-            for j in range(n):
-                # Calculate the coordinates
-                x.append(radius * math.sin(math.pi * i / n) * math.cos(2 * math.pi * j / n))
-                y.append(radius * math.sin(math.pi * i / n) * math.sin(2 * math.pi * j / n))
-                z.append(radius * math.cos(math.pi * i / n))
-
-        polyline = np.column_stack((x, y, z))
+    def get_sphere_polyline(self, radius, refinment_order=0):
+        polyline = pymesh.generate_icosphere(radius=radius,
+                                             center=(0, 0, 0),
+                                             refinement_order=refinment_order).vertices
         return polyline
