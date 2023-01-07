@@ -94,7 +94,6 @@ class HingeCreator(object):
 
     def scale_hinge(self):
         # Scale by the X axis of the bounding box of the case
-
         max_case_width = (self.bottom_half.bbox[1][0] - self.bottom_half.bbox[0][0]) * self.MAX_SCALE
         print(f'Case width: {max_case_width}')
         sock_width = self.SOCK.bbox[1][0] - self.SOCK.bbox[0][0]
@@ -106,23 +105,13 @@ class HingeCreator(object):
             sock_width *= scale
 
         print(f'Hinge width: {sock_width}')
-
-    @property
-    def hinge_connection_point(self):
-        return self._part_connection_point(self.HINGE)
-
-    @property
-    def sock_connection_point(self):
-        return self._part_connection_point(self.SOCK)
     
-    def _part_connection_point(self, part):
-        return np.array([(part.bbox[0][0] + part.bbox[1][0]) / 2,
-                          part.bbox[0][1], part.bbox[1][2]])
-    
-    def part_height(self, part):
+    @staticmethod
+    def part_height(part):
         return part.bbox[1][2] - part.bbox[0][2]
 
-    def get_slice_at_z_values(self, mesh, bottom_z, top_z):
+    @staticmethod
+    def get_slice_at_z_values(mesh, bottom_z, top_z):
         MAX = 1000
         box_min = np.array([-MAX, -MAX, bottom_z])
         box_max = np.array([MAX, MAX, top_z])
@@ -130,7 +119,7 @@ class HingeCreator(object):
         return pymesh.boolean(mesh, slice, 'intersection')
 
     @property
-    def placement_point(self):
+    def case_placement_point(self):
         """
         For the x axis - place in the middle of the case
         For the y axis - place outside of the inner hull of the part which is parallel to the hinge and sock.
@@ -146,30 +135,38 @@ class HingeCreator(object):
 
         return np.array([x_val, y_val, z_val])
 
-    def get_hinge(self):
-        hinge = pymesh.form_mesh(self.HINGE.vertices + (self.placement_point - self.hinge_connection_point), self.HINGE.faces)
-        return hinge
+    @property
+    def hinge(self):
+        return self._move_to_placement(self.HINGE)
     
-    def get_sock(self):                
-        sock = pymesh.form_mesh(self.SOCK.vertices + (self.placement_point - self.sock_connection_point), self.SOCK.faces)
-        return sock
+    @property
+    def sock(self):
+        return self._move_to_placement(self.SOCK)
+    
+    @staticmethod
+    def _part_connection_point(part):
+        return np.array([(part.bbox[0][0] + part.bbox[1][0]) / 2,
+                          part.bbox[0][1], part.bbox[1][2]])
+
+    def _move_to_placement(self, part):
+        moved_part = pymesh.form_mesh(part.vertices + (self.case_placement_point - self._part_connection_point(part)), part.faces)
+        return moved_part
 
     def connect_sock(self):
         # First we must clear the path for the socket to exist on the edge of the case.
-        hinge_bbox = self.get_hinge().bbox
+        hinge_bbox = self.hinge.bbox
         inner_y_value = (self.bottom_interior.bbox[0][1] + self.bottom_interior.bbox[1][1]) / 2
         extra_bbox_x = np.array([hinge_bbox[0][0], inner_y_value, hinge_bbox[0][2]])
         hinge_box = pymesh.generate_box_mesh(extra_bbox_x, hinge_bbox[1])
 
         self.bottom_half = pymesh.boolean(self.bottom_half, hinge_box, operation='difference')
-        self.bottom_half = pymesh.boolean(self.bottom_half, self.get_sock(), operation='union')
+        self.bottom_half = pymesh.boolean(self.bottom_half, self.sock, operation='union')
 
     def connect_hinge(self):
-        sock = self.get_sock()
-        height = self.part_height(sock) / 3
+        height = self.part_height(self.sock) / 3
         
         # Create some space in the upper case to allow movement around the sockets.
-        sock1, sock2 = pymesh.separate_mesh(sock)
+        sock1, sock2 = pymesh.separate_mesh(self.sock)
         sock1 = pymesh.convex_hull(sock1)
         sock2 = pymesh.convex_hull(sock2)
         upper_sock = pymesh.merge_meshes([sock1, sock2])
@@ -177,4 +174,4 @@ class HingeCreator(object):
         self.top_half = pymesh.boolean(self.top_half, upper_sock, operation='difference')
 
         # Connect the hinge
-        self.top_half = pymesh.boolean(self.top_half, self.get_hinge(), operation='union')
+        self.top_half = pymesh.boolean(self.top_half, self.hinge, operation='union')
