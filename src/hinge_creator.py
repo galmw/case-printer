@@ -59,10 +59,8 @@ class HingeCreator(object):
         rot_points = np.dot(rotations, hull_points.T)
 
         # find the bounding points
-        min_x = np.nanmin(rot_points[:, 0], axis=1)
-        max_x = np.nanmax(rot_points[:, 0], axis=1)
-        min_y = np.nanmin(rot_points[:, 1], axis=1)
-        max_y = np.nanmax(rot_points[:, 1], axis=1)
+        min_x, min_y = np.nanmin(rot_points[:, 0], axis=1), np.nanmin(rot_points[:, 1], axis=1)
+        max_x, max_y = np.nanmax(rot_points[:, 0], axis=1), np.nanmax(rot_points[:, 1], axis=1)
 
         # find the box with the best area
         areas = (max_x - min_x) * (max_y - min_y)
@@ -79,16 +77,14 @@ class HingeCreator(object):
             rotate_90_degrees = np.array([[0, -1], [1, 0]])
             r = np.matmul(rotate_90_degrees, r)
 
-        spatial_rotation_matrix = np.eye(3)
-        spatial_rotation_matrix[0][0] = r[0][0]
-        spatial_rotation_matrix[0][1] = r[0][1]
-        spatial_rotation_matrix[1][0] = r[1][0]
-        spatial_rotation_matrix[1][1] = r[1][1]
+        rotate_matrix = np.eye(3)
+        rotate_matrix[0][0], rotate_matrix[0][1] = r[0][0], r[0][1]
+        rotate_matrix[1][0], rotate_matrix[1][1] = r[1][0], r[1][1]
 
-        self.bottom_half = self.rotate_mesh_by_matrix(self.bottom_half, spatial_rotation_matrix)
-        self.top_half = self.rotate_mesh_by_matrix(self.top_half, spatial_rotation_matrix)
-        self.bottom_interior = self.rotate_mesh_by_matrix(self.bottom_interior, spatial_rotation_matrix)
-        self.top_interior = self.rotate_mesh_by_matrix(self.top_interior, spatial_rotation_matrix)
+        self.bottom_half = self.rotate_mesh_by_matrix(self.bottom_half, rotate_matrix)
+        self.top_half = self.rotate_mesh_by_matrix(self.top_half, rotate_matrix)
+        self.bottom_interior = self.rotate_mesh_by_matrix(self.bottom_interior, rotate_matrix)
+        self.top_interior = self.rotate_mesh_by_matrix(self.top_interior, rotate_matrix)
     
     @staticmethod
     def rotate_mesh_by_matrix(mesh, spatial_rotation_matrix):
@@ -107,54 +103,55 @@ class HingeCreator(object):
             scale = max_case_width / sock_width
             self.SOCK = pymesh.form_mesh(self.SOCK.vertices * scale, self.SOCK.faces)
             self.HINGE = pymesh.form_mesh(self.HINGE.vertices * scale, self.HINGE.faces)
+            sock_width *= scale
 
         print(f'Hinge width: {sock_width}')
 
     @property
     def hinge_connection_point(self):
-        return np.array([(self.HINGE.bbox[0][0] + self.HINGE.bbox[1][0]) / 2,
-                          self.HINGE.bbox[0][1], self.HINGE.bbox[1][2]])
+        return self._part_connection_point(self.HINGE)
 
     @property
     def sock_connection_point(self):
-        return np.array([(self.SOCK.bbox[0][0] + self.SOCK.bbox[1][0]) / 2,
-                          self.SOCK.bbox[0][1], self.SOCK.bbox[1][2]])
+        return self._part_connection_point(self.SOCK)
     
-    def get_x_placement_value(self):
-        return (self.bottom_half.bbox[0][0] + self.bottom_half.bbox[1][0]) / 2
+    def _part_connection_point(self, part):
+        return np.array([(part.bbox[0][0] + part.bbox[1][0]) / 2,
+                          part.bbox[0][1], part.bbox[1][2]])
+    
+    def part_height(self, part):
+        return part.bbox[1][2] - part.bbox[0][2]
 
-    def get_y_placement_value(self):
-        """
-        Start at the edge of the bottom bounding box, and then make sure the distance is zero.
-        """
-        desired_y = self.bottom_interior.bbox[1][1]
+    def get_slice_at_z_values(self, mesh, bottom_z, top_z):
+        MAX = 1000
+        box_min = np.array([-MAX, -MAX, bottom_z])
+        box_max = np.array([MAX, MAX, top_z])
+        slice = pymesh.generate_box_mesh(box_min, box_max)
+        return pymesh.boolean(mesh, slice, 'intersection')
 
+    @property
+    def placement_point(self):
         """
-        slice = pymesh.slice_mesh(self.bottom_interior, np.array([0, 0, 1]), 1)[0]
-        desired_y = slice.bbox[1][1]
-        desired_point = np.array([self.get_x_placement_value(), desired_y, self.bottom_half.bbox[1][2]]).reshape(1,3)
-        extra_distance_needed = math.sqrt(pymesh.distance_to_mesh(self.bottom_interior, desired_point)[0])
+        For the x axis - place in the middle of the case
+        For the y axis - place outside of the inner hull of the part which is parallel to the hinge and sock.
+        For the z axis - place right below the top
         """
-        extra_distance_needed = 0
-        return desired_y - extra_distance_needed
+        x_val = (self.bottom_half.bbox[0][0] + self.bottom_half.bbox[1][0]) / 2
+        z_val = self.bottom_half.bbox[1][2] # Also equals self.top_half.bbox[0][2]
+
+        # For the Y value, create a slice:
+        slice = self.get_slice_at_z_values(self.bottom_interior,
+                                           z_val - self.part_height(self.SOCK), z_val)
+        y_val = slice.bbox[1][1]
+
+        return np.array([x_val, y_val, z_val])
 
     def get_hinge(self):
-        mesh_placement_point = np.array(
-            [self.get_x_placement_value(), self.get_y_placement_value(), self.top_half.bbox[0][2]])
-
-        hinge = pymesh.form_mesh(self.HINGE.vertices + (mesh_placement_point - self.hinge_connection_point), self.HINGE.faces)
+        hinge = pymesh.form_mesh(self.HINGE.vertices + (self.placement_point - self.hinge_connection_point), self.HINGE.faces)
         return hinge
     
     def get_sock(self):                
-        """
-        For the x axis - place in the middle
-        For the y axis - place outside of the inner hull
-        For the z axis - place inside the edge
-        """
-        mesh_placement_point = np.array(
-            [self.get_x_placement_value(), self.get_y_placement_value(), self.bottom_half.bbox[1][2]])
-        
-        sock = pymesh.form_mesh(self.SOCK.vertices + (mesh_placement_point - self.sock_connection_point), self.SOCK.faces)
+        sock = pymesh.form_mesh(self.SOCK.vertices + (self.placement_point - self.sock_connection_point), self.SOCK.faces)
         return sock
 
     def connect_sock(self):
@@ -169,14 +166,15 @@ class HingeCreator(object):
 
     def connect_hinge(self):
         sock = self.get_sock()
-        height = (sock.bbox[1][2] - sock.bbox[0][2]) / 3
+        height = self.part_height(sock) / 3
         
+        # Create some space in the upper case to allow movement around the sockets.
         sock1, sock2 = pymesh.separate_mesh(sock)
         sock1 = pymesh.convex_hull(sock1)
         sock2 = pymesh.convex_hull(sock2)
         upper_sock = pymesh.merge_meshes([sock1, sock2])
         upper_sock = pymesh.form_mesh(upper_sock.vertices + np.array([0, 0, height]), upper_sock.faces)
-
-        #upper_sock = pymesh.form_mesh(sock.vertices + np.array([0, 0, height]), sock.faces)
         self.top_half = pymesh.boolean(self.top_half, upper_sock, operation='difference')
+
+        # Connect the hinge
         self.top_half = pymesh.boolean(self.top_half, self.get_hinge(), operation='union')
