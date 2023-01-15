@@ -11,9 +11,9 @@ def main():
     args = parser.parse_args()
     filename = args.filename
 
-    base, ext = os.path.splitext(filename)
-    top_output_filename = f'{OUTPUT_DIR}/{base}_case_top{ext}'
-    bottom_output_filename = f'{OUTPUT_DIR}/{base}_case_bottom{ext}'
+    base, ext = os.path.splitext(os.path.basename(filename))
+    top_output_filename = os.path.join(OUTPUT_DIR, f'{base}_case_top{ext}')
+    bottom_output_filename = os.path.join(OUTPUT_DIR, f'{base}_case_bottom{ext}')
     if not os.path.exists(OUTPUT_DIR):
         os.mkdir(OUTPUT_DIR)
 
