@@ -24,7 +24,7 @@ def main():
     cp.save_mesh_to_file(top_half, top_output_filename)
 
     print("Done")
-    cp.display_two_meshes(bottom_half, top_half)
+    cp.display_two_meshes(bottom_half, top_half, joined=False)
     
 
 if __name__ == '__main__':

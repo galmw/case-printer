@@ -36,7 +36,7 @@ def get_case_gravity_orientation(mesh_path, show_gui=False):
             time.sleep(0.01)
     print("Done simulating")
 
-    position, orientation = p.getBasePositionAndOrientation(mesh_id)
+    _, orientation = p.getBasePositionAndOrientation(mesh_id)
 
     p.disconnect()
     return orientation

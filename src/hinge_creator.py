@@ -1,7 +1,6 @@
 import pymesh
 import os
 import numpy as np
-import math
 from scipy.spatial import ConvexHull
 from scipy.spatial.transform import Rotation
 
@@ -10,7 +9,7 @@ class HingeCreator(object):
     SOCK = pymesh.load_mesh(os.path.join('src', 'socket.stl'))
     HINGE = pymesh.load_mesh(os.path.join('src', 'hinge.stl'))
 
-    MAX_HINGE_SCALE = 0.6
+    MAX_HINGE_SCALE = 0.8
 
     def __init__(self, bottom_half, top_half, bottom_interior, top_interior) -> None:
         """

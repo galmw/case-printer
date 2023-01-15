@@ -1,9 +1,7 @@
 import pymesh
 import pyvista
-import numpy as np
 from numpy.linalg import norm
 import os
-import math
 from gravity_simulator import get_case_gravity_orientation
 from scipy.spatial.transform import Rotation
 from hinge_creator import HingeCreator
@@ -15,7 +13,7 @@ class CasePrinter(object):
         self._output_dir = output_dir
         self._mesh = self.fix_mesh(self._mesh, detail='low')
 
-    def create_case(self, thickness=0.1, space=0.05, use_minkowski_sum=False, gravity_rotate=True) -> pymesh.Mesh:
+    def create_case(self, thickness=0.1, space=0.05, use_minkowski_sum=False, gravity_rotate=False) -> pymesh.Mesh:
         print("Comupting convex hull")
         hull = pymesh.convex_hull(self._mesh)
 
@@ -98,18 +96,23 @@ class CasePrinter(object):
         # Show the plot
         mesh.plot()
 
-    def display_two_meshes(self, mesh1, mesh2, show_edges=False):
-        plotter = pyvista.Plotter(shape=(1, 2))
+    def display_two_meshes(self, mesh1, mesh2, show_edges=False, joined=False):
+        if not joined:
+            plotter = pyvista.Plotter(shape=(1, 2))
 
-        plotter.add_text("Bottom Half", font_size=30)
-        plotter.add_mesh(self._pymesh_to_pyvista(mesh1), show_edges=show_edges)
+            plotter.add_text("Bottom Half", font_size=30)
+            plotter.add_mesh(self._pymesh_to_pyvista(mesh1), show_edges=show_edges)
 
-        plotter.subplot(0, 1)
-        plotter.add_text("Top half\n", font_size=30)
-        plotter.add_mesh(self._pymesh_to_pyvista(mesh2), show_edges=show_edges)
-        # Optional - plotter.link_views()
-        plotter.show()
-
+            plotter.subplot(0, 1)
+            plotter.add_text("Top half\n", font_size=30)
+            plotter.add_mesh(self._pymesh_to_pyvista(mesh2), show_edges=show_edges)
+            # Optional - plotter.link_views()
+            plotter.show()
+        else:
+            joined = pymesh.merge_meshes([mesh1, mesh2])
+            self.save_mesh_to_file(joined, "temp.obj")
+            self.display_stl( "temp.obj")
+        
     @staticmethod
     def fix_mesh(mesh, detail="normal"):
         bbox_min, bbox_max = mesh.bbox
