@@ -13,7 +13,7 @@ class CasePrinter(object):
         self._output_dir = output_dir
         self._mesh = self.fix_mesh(self._mesh, detail='low')
 
-    def create_case(self, thickness=0.1, space=0.05, use_minkowski_sum=False, gravity_rotate=False) -> pymesh.Mesh:
+    def create_case(self, thickness=0.1, space=0.05, use_minkowski_sum=False, gravity_rotate=True) -> pymesh.Mesh:
         print("Comupting convex hull")
         hull = pymesh.convex_hull(self._mesh)
 
