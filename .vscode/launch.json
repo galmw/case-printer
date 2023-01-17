@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "src/main.py",
             "console": "integratedTerminal",
-            "args": ["scans/airpods.stl"],
+            "args": ["scans/20d_cube.stl"],
             "justMyCode": true
         }
     ]
